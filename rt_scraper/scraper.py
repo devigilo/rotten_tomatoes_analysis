@@ -2,6 +2,7 @@ import time
 import random
 import os
 import argparse
+import logging
 import pandas as pd
 from datetime import datetime
 from selenium import webdriver
@@ -10,9 +11,16 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, StaleElementReferenceException
+from selenium.common.exceptions import (
+    TimeoutException,
+    NoSuchElementException,
+    ElementClickInterceptedException,
+    StaleElementReferenceException,
+)
 import re
 import sys
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 global_title = "placeholder"
 
@@ -32,7 +40,7 @@ def extract_release_date(driver):
                 # If parsing fails, return the original text
                 return release_date_text.replace(' ', '_').replace(',', '')
     except (NoSuchElementException, Exception) as e:
-        print(f"Could not extract release date: {e}")
+        logging.warning("Could not extract release date: %s", e)
     
     return None
 
@@ -139,7 +147,7 @@ def wait_for_load_more_button(driver, timeout=10):
         # If we get here, we couldn't find the button with any selector
         return None
     except Exception as e:
-        print(f"Error waiting for Load More button: {e}")
+        logging.error("Error waiting for Load More button: %s", e)
         return None
 
 def ensure_reviews_suffix(url):
@@ -180,7 +188,7 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
 
     global global_title
 
-    print(f"Starting Selenium WebDriver to scrape: {url}")
+    logging.info("Starting Selenium WebDriver to scrape: %s", url)
     driver = setup_driver(headless)
     release_date = None
 
@@ -188,7 +196,7 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
     
     try:
         # Navigate to the page
-        print("Loading page...")
+        logging.info("Loading page...")
         driver.get(url)
         
         # Wait for the page to load
@@ -198,22 +206,22 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
                 EC.presence_of_element_located((By.CLASS_NAME, "review-row"))
             )
         except TimeoutException:
-            print("Timed out waiting for page to load")
+            logging.error("Timed out waiting for page to load")
             return [], None
         
         release_date = extract_release_date(driver)
         if release_date:
-            print(f"Movie release date: {release_date}")
+            logging.info("Movie release date: %s", release_date)
         
         # Get initial page title for verification
         try:
             movie_title_element = driver.find_element(By.CLASS_NAME, "sidebar-title")
             if movie_title_element:
                 movie_title = movie_title_element.text
-                print(f"Scraping reviews for: {movie_title}")
+                logging.info("Scraping reviews for: %s", movie_title)
                 global_title = movie_title
         except NoSuchElementException:
-            print("Could not find movie title, continuing anyway")
+            logging.warning("Could not find movie title, continuing anyway")
         
         # Initialize variables
         all_reviews = []
@@ -228,7 +236,7 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
         
         # Process visible reviews first
         process_visible_reviews(driver, all_reviews, seen_review_ids, url)
-        print(f"Initially found {len(all_reviews)} reviews")
+        logging.info("Initially found %d reviews", len(all_reviews))
         last_review_count = len(all_reviews)
         
         # Click "Load More" button repeatedly until there are no more reviews or we reach max_reviews
@@ -241,20 +249,20 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
             load_more_button = wait_for_load_more_button(driver, timeout=10)
             
             if not load_more_button:
-                print("No 'Load More' button found, trying one more scroll...")
+                logging.info("No 'Load More' button found, trying one more scroll...")
                 # Try one more scroll to make sure
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(scroll_delay * 2)
                 load_more_button = wait_for_load_more_button(driver, timeout=5)
                 
                 if not load_more_button:
-                    print("Still no 'Load More' button found. Assuming we've reached the end.")
+                    logging.info("Still no 'Load More' button found. Assuming we've reached the end.")
                     break
             
             try:
                 # Increment attempt counter before clicking
                 load_more_attempts += 1
-                print(f"Clicking 'Load More' button (attempt #{load_more_attempts})...")
+                logging.info("Clicking 'Load More' button (attempt #%d)...", load_more_attempts)
                 
                 # Scroll to the button and click it with JavaScript
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", load_more_button)
@@ -278,24 +286,33 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
                     
                     # Check if we got new reviews
                     if new_count > old_count:
-                        print(f"Added {new_count - old_count} new reviews. Total: {new_count}")
+                        logging.info("Added %d new reviews. Total: %d", new_count - old_count, new_count)
                         consecutive_failures = 0  # Reset failure counter on success
                         last_review_count = new_count
                     else:
                         consecutive_failures += 1
-                        print(f"No new reviews found after clicking 'Load More'. Failures: {consecutive_failures}/{max_consecutive_failures}")
+                        logging.info(
+                            "No new reviews found after clicking 'Load More'. Failures: %d/%d",
+                            consecutive_failures,
+                            max_consecutive_failures,
+                        )
                         
                         # If we've had too many consecutive failures, assume we're done
                         if consecutive_failures >= max_consecutive_failures:
-                            print(f"Stopping after {consecutive_failures} consecutive failures to load new reviews")
+                            logging.error(
+                                "Stopping after %d consecutive failures to load new reviews",
+                                consecutive_failures,
+                            )
                             break
                 except StaleElementReferenceException:
                     # The page was updated, try getting the reviews again
-                    print("Page updated, re-collecting reviews...")
+                    logging.info("Page updated, re-collecting reviews...")
                     process_visible_reviews(driver, all_reviews, seen_review_ids, url)
                     new_count = len(all_reviews)
                     if new_count > last_review_count:
-                        print(f"Added {new_count - last_review_count} new reviews. Total: {new_count}")
+                        logging.info(
+                            "Added %d new reviews. Total: %d", new_count - last_review_count, new_count
+                        )
                         consecutive_failures = 0
                         last_review_count = new_count
                     else:
@@ -303,15 +320,15 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
                 
                 # Add a random delay between clicks to look more human-like
                 delay = random.uniform(min_delay, max_delay)
-                print(f"Waiting {delay:.2f} seconds before next click...")
+                logging.info("Waiting %.2f seconds before next click...", delay)
                 time.sleep(delay)
                 
             except (ElementClickInterceptedException, StaleElementReferenceException) as e:
-                print(f"Error clicking 'Load More' button: {e}")
+                logging.error("Error clicking 'Load More' button: %s", e)
                 consecutive_failures += 1
                 
                 if consecutive_failures >= max_consecutive_failures:
-                    print(f"Stopping after {consecutive_failures} consecutive failures to click the button")
+                    logging.error("Stopping after %d consecutive failures to click the button", consecutive_failures)
                     break
                     
                 # Try to refresh the page state
@@ -322,13 +339,13 @@ def scrape_reviews_with_selenium(url, max_reviews=None, min_delay=1, max_delay=2
             
             # Check if we need to break due to max_reviews
             if max_reviews is not None and len(all_reviews) >= max_reviews:
-                print(f"Reached maximum number of reviews ({max_reviews})")
+                logging.info("Reached maximum number of reviews (%d)", max_reviews)
                 break
         
         # Do one final check for any reviews we might have missed
         process_visible_reviews(driver, all_reviews, seen_review_ids, url)
         
-        print(f"Completed scraping. Found {len(all_reviews)} total unique reviews.")
+        logging.info("Completed scraping. Found %d total unique reviews.", len(all_reviews))
         return all_reviews, release_date
 
     
@@ -349,7 +366,7 @@ def process_visible_reviews(driver, all_reviews, seen_review_ids, original_url):
                     EC.presence_of_element_located((By.CLASS_NAME, "review-row"))
                 )
             except TimeoutException:
-                print("Warning: Timed out waiting for reviews to appear")
+                logging.warning("Timed out waiting for reviews to appear")
                 return
                 
             # Get all review elements
@@ -368,23 +385,27 @@ def process_visible_reviews(driver, all_reviews, seen_review_ids, original_url):
                             seen_review_ids.add(review_id)
                             all_reviews.append(review_data)
                     except Exception as e:
-                        print(f"Error extracting review data: {e}")
+                        logging.error("Error extracting review data: %s", e)
                         continue
                         
                 # Success, so break the retry loop
                 break
             else:
                 # No reviews found, retry
-                print(f"No review elements found (try {retry_count+1}/{max_retries})")
+                logging.info(
+                    "No review elements found (try %d/%d)", retry_count + 1, max_retries
+                )
                 retry_count += 1
                 time.sleep(1)
         except StaleElementReferenceException:
             # Page was updated during processing, retry
-            print(f"Page updated while processing reviews (try {retry_count+1}/{max_retries})")
+            logging.info(
+                "Page updated while processing reviews (try %d/%d)", retry_count + 1, max_retries
+            )
             retry_count += 1
             time.sleep(1)
         except Exception as e:
-            print(f"Error in process_visible_reviews: {e}")
+            logging.error("Error in process_visible_reviews: %s", e)
             retry_count += 1
             time.sleep(1)
 
@@ -459,14 +480,14 @@ def extract_review_data(review_element, original_url):
         return review_data
         
     except Exception as e:
-        print(f"Error in extract_review_data: {e}")
+        logging.error("Error in extract_review_data: %s", e)
         raise
 
 def save_reviews(reviews, movie_title=None, release_date=None, output_dir="reviews"):
     """Save reviews to CSV file with proper formatting and movie name"""
     
     if not reviews:
-        print("No reviews to save!")
+        logging.warning("No reviews to save!")
         return False
     
     # Create output directory if it doesn't exist
@@ -481,12 +502,12 @@ def save_reviews(reviews, movie_title=None, release_date=None, output_dir="revie
     # First check the passed movie_title parameter
     if movie_title and movie_title.strip():
         title_to_use = movie_title
-        print(f"Using provided movie title: {title_to_use}")
+        logging.info("Using provided movie title: %s", title_to_use)
     
     # Next check the global_title
     elif global_title and global_title != "placeholder":
         title_to_use = global_title
-        print(f"Using global title: {title_to_use}")
+        logging.info("Using global title: %s", title_to_use)
     
     # Finally, try to extract from the first review URL
     else:
@@ -495,7 +516,7 @@ def save_reviews(reviews, movie_title=None, release_date=None, output_dir="revie
             extracted_title = extract_movie_title(movie_url)
             if extracted_title:
                 title_to_use = extracted_title
-                print(f"Using extracted title from URL: {title_to_use}")
+                logging.info("Using extracted title from URL: %s", title_to_use)
         except (IndexError, AttributeError):
             # If we can't extract a title, we'll use the default
             pass
@@ -515,7 +536,7 @@ def save_reviews(reviews, movie_title=None, release_date=None, output_dir="revie
             filename = f"{output_dir}/reviews_{release_date}_{timestamp}.csv"
         else:
             filename = f"{output_dir}/reviews_{timestamp}.csv"
-        print("Warning: Could not determine movie title, using generic filename.")
+        logging.warning("Could not determine movie title, using generic filename.")
     
     # Convert to DataFrame and save
     df = pd.DataFrame(reviews)
@@ -528,173 +549,20 @@ def save_reviews(reviews, movie_title=None, release_date=None, output_dir="revie
         'Scores': len(df[df['Review Score'] == 'unknown'])
     }
     
-    print("\nData quality check:")
+    logging.info("Data quality check:")
     for field, count in unknown_counts.items():
         percentage = (count / len(df)) * 100 if len(df) > 0 else 0
-        print(f"- {field} unknown: {count}/{len(df)} ({percentage:.1f}%)")
+        logging.info("- %s unknown: %d/%d (%.1f%%)", field, count, len(df), percentage)
     
     # Save to CSV
     df.to_csv(filename, index=False, encoding='utf-8')
-    print(f"\n✓ Successfully saved {len(df)} reviews to '{filename}'")
-    print(f"✓ DataFrame shape: {df.shape}")
+    logging.info("Saved %d reviews to '%s'", len(df), filename)
+    logging.info("DataFrame shape: %s", df.shape)
     
     # Print sample of the data
-    print("\nSample of saved data:")
+    logging.info("Sample of saved data:")
     sample_columns = ['Critic', 'Publication', 'Review Score', 'Date']
-    print(df[sample_columns].head(3))
+    logging.info("\n%s", df[sample_columns].head(3))
     
     return True
-
-def final_review_capture(driver, url):
-    """
-    Specialized function to capture the final review when stuck at 380.
-    Add this to your script and call it right after scrape_reviews_with_selenium 
-    if it returned exactly 380 reviews.
-    """
-    import time
-    from selenium.webdriver.common.by import By
-    
-    print("\n=== ATTEMPTING SPECIALIZED FINAL REVIEW CAPTURE ===")
-    
-    # Force scroll to the very bottom of the page
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(2)
-    
-    try:
-        # Try to click the Load More button directly via JavaScript
-        load_more_elements = driver.find_elements(By.XPATH, "//rt-button[contains(@class, 'load-more-button') or @data-qa='load-more-btn']")
-        if load_more_elements:
-            print(f"Found {len(load_more_elements)} potential Load More buttons")
-            for i, element in enumerate(load_more_elements):
-                try:
-                    print(f"Attempting to force-click button {i+1}...")
-                    driver.execute_script("arguments[0].click();", element)
-                    time.sleep(3)  # Wait for content to load
-                except Exception as e:
-                    print(f"Error clicking button {i+1}: {e}")
-        else:
-            print("No Load More buttons found by primary selector")
-            
-            # Try alternative selectors
-            alternative_elements = driver.find_elements(By.XPATH, "//div[contains(@class, 'load-more-container')]//rt-button")
-            if alternative_elements:
-                print(f"Found {len(alternative_elements)} buttons with alternative selector")
-                for i, element in enumerate(alternative_elements):
-                    try:
-                        print(f"Attempting to force-click alternative button {i+1}...")
-                        driver.execute_script("arguments[0].click();", element)
-                        time.sleep(3)  # Wait for content to load
-                    except Exception as e:
-                        print(f"Error clicking alternative button {i+1}: {e}")
-            else:
-                print("No buttons found with alternative selector either")
-                
-        # Extract review info from all visible reviews
-        print("Attempting to collect all visible reviews after force-clicking...")
-        all_reviews = []
-        review_elements = driver.find_elements(By.CLASS_NAME, "review-row")
-        print(f"Found {len(review_elements)} review elements")
-        
-        # Get the last review (should be the missing one if we have 380 already)
-        if review_elements and len(review_elements) > 380:
-            final_review = review_elements[-1]
-            print("Examining final review element:")
-            try:
-                # Extract critic name
-                critic_element = final_review.find_element(By.CLASS_NAME, "display-name")
-                critic_name = critic_element.text if critic_element else "Unknown"
-                print(f"Final review critic: {critic_name}")
-                
-                # Extract text snippet
-                text_element = final_review.find_element(By.CLASS_NAME, "review-text")
-                text_snippet = text_element.text[:50] + "..." if text_element else "No text available"
-                print(f"Final review text snippet: {text_snippet}")
-                
-                # Extract date
-                date_element = final_review.find_element(By.XPATH, ".//span[@data-qa='review-date']")
-                date = date_element.text if date_element else "Unknown"
-                print(f"Final review date: {date}")
-                
-                print("Successfully extracted info from final review!")
-                return True
-            except Exception as e:
-                print(f"Error extracting final review info: {e}")
-        else:
-            print("Could not find additional reviews beyond 380")
-            
-    except Exception as e:
-        print(f"Error in final_review_capture: {e}")
-    
-    print("=== END OF SPECIALIZED FINAL REVIEW CAPTURE ===\n")
-    return False
-def main():
-    global global_title
-
-    parser = argparse.ArgumentParser(description='Scrape Rotten Tomatoes reviews using Selenium')
-    parser.add_argument('url', help='Rotten Tomatoes URL for movie reviews (e.g., https://www.rottentomatoes.com/m/movie_name/reviews)')
-    parser.add_argument('--max-reviews', type=int, default=None, help='Maximum number of reviews to collect (default: all available)')
-    parser.add_argument('--min-delay', type=int, default=1, help='Minimum delay between clicks in seconds (default: 4)')
-    parser.add_argument('--max-delay', type=int, default=3, help='Maximum delay between clicks in seconds (default: 8)')
-    parser.add_argument('--scroll-delay', type=float, default=1, help='Delay after scrolling in seconds (default: 1)')
-    parser.add_argument('--max-attempts', type=int, default=25, help='Maximum number of attempts to click "Load More" (default: 25)')
-    parser.add_argument('--output', default='reviews', help='Output directory for CSV files')
-    parser.add_argument('--visible', action='store_true', help='Run Chrome in visible mode (not headless)')
-    
-    args = parser.parse_args()
-    
-    # Extract movie title from URL
-    movie_title = extract_movie_title(args.url)
-    if movie_title:
-        print(f"Scraping reviews for: {movie_title}")
-        global_title = movie_title
-        print(global_title)
-    
-    # Scrape reviews using Selenium
-     # Scrape reviews using Selenium
-    reviews, release_date = scrape_reviews_with_selenium(
-        args.url,
-        max_reviews=args.max_reviews,
-        min_delay=args.min_delay,
-        max_delay=args.max_delay,
-        scroll_delay=args.scroll_delay,
-        headless=not args.visible,
-        max_attempts=args.max_attempts
-    )
-
-
-    # Add this to your main function right after calling scrape_reviews_with_selenium:
-    # Check if we need to capture the final review
-    # if len(reviews) == 380:
-    #     print("Detected exactly 380 reviews - attempting to capture the final review")
-    #     driver = setup_driver(headless=not args.visible)
-    #     try:
-    #         driver.get(args.url)
-    #         time.sleep(5)  # Let the page load
-    #         final_review_capture(driver, args.url)
-    #         # Now try one more time to get all reviews
-    #         extra_reviews = scrape_reviews_with_selenium(
-    #             args.url,
-    #             min_delay=1,
-    #             max_delay=2,  # Use faster delays
-    #             scroll_delay=0.5,
-    #             headless=not args.visible,
-    #             max_attempts=5  # Just a few attempts
-    #         )
-    #         # Add any new reviews
-    #         for review in extra_reviews:
-    #             if review not in reviews:
-    #                 reviews.append(review)
-    #     finally:
-    #         driver.quit()
-    
-    # Save reviews
-     # Save reviews with release date
-    if reviews:
-        save_reviews(reviews, movie_title, release_date, args.output)
-        print(f"Total reviews collected: {len(reviews)}")
-    else:
-        print("No reviews were collected.")
-
-if __name__ == "__main__":
-    main()
 
