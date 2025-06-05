@@ -1,0 +1,50 @@
+python rt-review-analyzer.py --file reviews/Beauty_and_the_Beast_2017_20250310_123456.csv
+python rt-review-analyzer.py --file reviews/reviews_20250310_100842.csv
+pip install seaborn
+python rt-review-analyzer.py --file reviews/reviews_20250310_100842.csv
+pip install nltk
+python rt-review-analyzer.py --file reviews/reviews_20250310_100842.csv
+pip install wordcloud
+python rt-review-analyzer.py --file reviews/reviews_20250310_100842.csv
+pip install nltk
+python download_nltk_data.py
+python rt-review-analyzer.py --file reviews/reviews_20250310_100842.csv
+python nltk-simplified.py reviews/reviews_20250310_100842.csv
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/novocaine_2025/reviews"
+python movie-comparison.py --movie1 reviews/reviews_20250310_100842.csv --movie1-name "Beauty and the Beast" --movie2 reviews/reviews_20250310_103442.csv --movie2-name "Novocaine"
+python rt-score-evolution.py --file reviews/reviews_20250310_100842.csv --movie-name "Beauty and the Beast"
+python rt-score-evolution-fixed.py --file reviews/reviews_20250310_100842.csv --movie-name "Beauty and the Beast"
+python rt-score-cutoff.py --file reviews/reviews_20250310_100842.csv --movie-name "Beauty and the Beast" --release-date 2017-03-17 --days-cutoff 4
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/the_lion_king_2019/reviews"
+python rt-score-cutoff.py --file reviews/reviews_20250310_113743.csv --movie-name "The Lion King" --release-date 2019-07-19 --days-cutoff 4 --output lion_king_4day.png
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/the_little_mermaid_2023/reviews"
+python rt-score-cutoff.py --file reviews/reviews_20250310_115455.csv --movie-name "The Little Mermaid" --release-date 2023-05-26 --days-cutoff 4 --output little_mermaid_4day.png
+python rt-score-cutoff.py --file reviews_20250310_100842.csv --movie-name "Beauty and the Beast" --release-date 2017-03-17 --days-cutoff 4 --output beauty_beast_4day.png --save-data
+python rt-score-cutoff.py --file reviews/reviews_20250310_100842.csv --movie-name "Beauty and the Beast" --release-date 2017-03-17 --days-cutoff 4 --output beauty_beast_4day.png --save-data
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/mulan_2020/reviews"
+python rt-score-cutoff.py --file reviews/reviews_20250310_121509.csv --movie-name "Mulan" --release-date 2020-09-04 --days-cutoff 4 --output mulan_4day.png --save-data
+echo "https://www.rottentomatoes.com/m/aladdin/reviews" > urls.txt
+echo "https://www.rottentomatoes.com/m/peter_pan_and_wendy/reviews" > urls.txt
+echo "https://www.rottentomatoes.com/m/aladdin/reviews" >> urls.txt >
+echo "https://www.rottentomatoes.com/m/aladdin/reviews" >> urls.txt
+cd rotten_tomatoes
+echo "https://www.rottentomatoes.com/m/aladdin/reviews" >> urls.txt
+python rt-batch-scraper.py urls.txt --output-dir reviews --min-delay 90 --max-delay 240
+python rt-batch-scraper-improved.py urls.txt --output-dir reviews --min-delay 90 --max-delay 240
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/mufasa_the_lion_king/reviews"
+python rt-score-cutoff.py --file reviews/reviews_20250310_124650.csv --movie-name "Mufasa: The Lion King" --release-date 2024-12-20 --days-cutoff 4 --output mufasa_4day.png --save-data
+powershell -ExecutionPolicy Bypass -File scrape_from_file.ps1
+python rt-score-cutoff.py --file reviews/reviews_20250310_131450.csv --movie-name "Peter Pan & Wendy" --release-date 2023-04-28 --days-cutoff 4 --output peterpan_wendy_4day.png --save-data
+python rt-score-cutoff.py --file reviews/reviews_20250310_133119.csv --movie-name "Aladdin" --release-date 2019-05-24 --days-cutoff 4 --output aladdin_4day.png --save-data
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/novocaine_2025/reviews"
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/tv/daredevil_born_again/s01/reviews"
+powershell -ExecutionPolicy Bypass -File scrape_from_file.ps1
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/novocaine_2025/reviews"
+python batch-process-releases.py --csv-dir reviews --cutoff-days 4
+python batch-extract-release-dates.py --csv-dir reviews --cutoff-days 4
+python batch-process-releases.py --csv-dir reviews --cutoff-days 4
+python fixed-batch-processor.py --csv-dir reviews --cutoff-days 4
+powershell -ExecutionPolicy Bypass -File scrape_from_file.ps1
+python fixed-batch-processor.py --csv-dir reviews --cutoff-days 4
+python rotten-tomatoes-selenium-bugfix.py "https://www.rottentomatoes.com/m/the_flash_2023/reviews"
+doskey /history > history.txt
