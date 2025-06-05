@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.sqlite3
+venv/
+.env
+.history
+.DS_Store
+data/*
+!data/README.md
